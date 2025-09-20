@@ -1,5 +1,6 @@
 name: Build APK
 
+# 支持 push 到 release 分支和手动触发
 on:
   push:
     branches:
@@ -11,18 +12,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取代码
+      # 拉取代码
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. 设置 JDK
+      # 设置 JDK
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # 3. 缓存 Gradle 依赖
+      # 缓存 Gradle 依赖
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -33,32 +34,22 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # 4. 创建 keystore 文件
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > release.keystore
-
-      # 5. 构建 Debug APK
+      # 构建 Debug APK
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 6. 构建 Release APK（自动签名）
-      - name: Build Signed Release APK
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=release.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+      # 构建 Release APK（可选，如果需要签名请配置签名步骤）
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
-      # 7. 上传 Debug APK
+      # 上传 Debug APK
       - name: Upload Debug APK
         uses: actions/upload-artifact@v3
         with:
           name: app-debug.apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      # 8. 上传 Release APK
+      # 上传 Release APK
       - name: Upload Release APK
         uses: actions/upload-artifact@v3
         with:
