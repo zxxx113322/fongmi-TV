@@ -1,32 +1,28 @@
-name: Build Android APK
+name: Build APK
 
-# 在 main 或 master 分支有 Push 或 Pull Request 时触发
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - release
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 检出仓库
-      - name: Checkout code
+      # 1. 拉取代码
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ 设置 JDK
-      - name: Set up JDK 17
+      # 2. 设置 JDK
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: '11'
 
-      # 3️⃣ 缓存 Gradle
+      # 3. 缓存 Gradle 依赖
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -37,13 +33,34 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # 4️⃣ 构建 APK
+      # 4. 创建 keystore 文件
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > release.keystore
+
+      # 5. 构建 Debug APK
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 5️⃣ 上传 APK 作为 Workflow Artifact
-      - name: Upload APK
+      # 6. 构建 Release APK（自动签名）
+      - name: Build Signed Release APK
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=release.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+
+      # 7. 上传 Debug APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v3
         with:
-          name: MyTVBox-APK
+          name: app-debug.apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # 8. 上传 Release APK
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.apk
+          path: app/build/outputs/apk/release/app-release.apk
